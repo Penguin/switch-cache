@@ -1,3 +1,6 @@
+This solution was developed on Ubuntu WSL running Python 2.7.18 and ran with the command './p4app run switch-cache/cache.p4app' from the p4app file level (above the switch-cache file).
+
+
 # In-Network Cache
 
 In this assignment you will implement a cache for a simple key-value service.

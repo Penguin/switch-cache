@@ -3,8 +3,8 @@
 #include <v1model.p4>
 
 const bit<16> TYPE_IPV4 = 0x800;
-const bit<8>  IP_PROT_UDP  = 0x11;
-const bit<16> UDP_PORT = 1234;
+const bit<8>  IP_PROT_UDP  = 0x11; // protocol opcode for UDP
+const bit<16> UDP_PORT = 1234; // "special" port that will ID packets as request/response
 
 typedef bit<9>  egressSpec_t;
 typedef bit<48> macAddr_t;
@@ -38,11 +38,11 @@ header udp_t {
     bit<16> checksum;
 }
 
-header request_t {
+header request_t { // simple header to hold just requested key
     bit<8> key;
 }
 
-header response_t {
+header response_t { // more complex header to hold requested key, valildity, and the associated value
     bit<8> key;
     bit<8> is_valid;
     bit<32> value;
@@ -89,7 +89,7 @@ parser MyParser(packet_in packet,
 
     state parse_udp {
         packet.extract(hdr.udp);
-        transition select(hdr.udp.dstPort) {
+        transition select(hdr.udp.dstPort) { // determines if the packet is a request or a response
             UDP_PORT: parse_request;
             default: parse_response;
         }
@@ -118,9 +118,10 @@ control MyIngress(inout headers hdr,
                   inout metadata meta,
                   inout standard_metadata_t standard_metadata) {
 
-    register<bit<32>>(256) values;
+    register<bit<32>>(256) values; // register that will act as the switch cache,
+                                   // storing values from the server at their associated index
 
-    bit<32> foundval = 0;
+    bit<32> foundval = 0; // temporary storage value for if we get a cache hit on the register
 
     action drop() {
         mark_to_drop(standard_metadata);
@@ -133,7 +134,7 @@ control MyIngress(inout headers hdr,
         hdr.ipv4.ttl = hdr.ipv4.ttl - 1;
     }
 
-    action retval(bit<32> value) {
+    action retval(bit<32> value) { // sets the proper headers and data to return the packet to the client
         standard_metadata.egress_spec = standard_metadata.ingress_port;
 
         ip4Addr_t tmpDstIp = hdr.ipv4.dstAddr;
@@ -155,11 +156,11 @@ control MyIngress(inout headers hdr,
         hdr.response.value = value;
     }
 
-    action check_register() {
+    action check_register() { // checks for a cache hit
         values.read(foundval, (bit<32>)hdr.request.key);
     }
 
-    action store_in_reg() {
+    action store_in_reg() { // stores a server response value in the cache
         values.write((bit<32>)hdr.response.key, (bit<32>)hdr.response.value);
     }
     
@@ -176,7 +177,7 @@ control MyIngress(inout headers hdr,
         default_action = drop();
     }
 
-    table static_cache { // cache table for staticly declared pairs
+    table static_cache { // cache table for statically declared pairs
         key = {
             hdr.request.key: exact;
         }
@@ -186,14 +187,14 @@ control MyIngress(inout headers hdr,
             NoAction;
         }
         size = 1024;
-        default_action = check_register;
+        default_action = check_register; // default action if we get a static cache miss- check the register cache
     }
     
     apply {
         if (hdr.request.isValid()) {
-            static_cache.apply();
+            static_cache.apply(); // checking for a static cache hit, by default checks for a register cache hit if we get a static cache miss
 
-            if (foundval !=0) {
+            if (foundval !=0) { // if foundval has been changed, we got a cache hit and can return that value to the client
                 retval(foundval);
                 foundval = 0;
             }

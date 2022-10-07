@@ -13,7 +13,7 @@ s1, h1, h2 = net.get('s1'), net.get('h1'), net.get('h2')
 
 
 
-# TODO Populate IPv4 forwarding table
+# Populate IPv4 forwarding table
 table_entries = []
 for i in range(1, N+1):
     table_entries.append(dict(
@@ -26,7 +26,7 @@ for i in range(1, N+1):
 for table_entry in table_entries:
     s1.insertTableEntry(table_entry)
 
-# TODO Populate the cache table
+# Populate the cache table - only a single static value based on the spec
 cache_entry = dict(
     table_name='MyIngress.static_cache',
     match_fields={'hdr.request.key': 3},
